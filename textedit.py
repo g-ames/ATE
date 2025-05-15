@@ -22,6 +22,8 @@ color_table = {
     "other" : (141, 128, 173),
     "double_string" : (226, 109, 90),
     "single_string" : (173, 50, 31),
+    "incomplete_double_string" : (226 // 2, 109 // 2, 90 // 2),
+    "incomplete_double_string" : (173 // 2, 50 // 2, 31 // 2),
     "keyword" : (24*2, 54*2, 66*2),
     "comment" : (3*3, 25*3, 39*3),
     "escapes" : (173 // 2, 50 // 2, 31 // 2)
@@ -48,8 +50,15 @@ def write_file(filename, backup=True):
     open(f"{'.' if backup else ''}{filename}{".ate" if backup else ""}", "w", encoding='utf-8').write("\n".join(lines))
 
 def check_backup(filename):
-    swap_contents = open(f".{filename}.ate", "r", encoding='utf-8').readlines()
+    if not os.path.exists(str(filename)):
+        canvas.message("That file doesn't exist!")
+        return None
+    
     normal_contents = open(f"{filename}", "r", encoding='utf-8').readlines()
+
+    swap_contents = normal_contents
+    if os.path.exists(f".{filename}.ate"):
+        swap_contents = open(f".{filename}.ate", "r", encoding='utf-8').readlines()
 
     to_keep = normal_contents
     if swap_contents != normal_contents:
@@ -136,6 +145,8 @@ while running:
                             open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
                     case "read" | "r" | "open" | "get":
                         to_keep = check_backup(commands[1])
+                        if to_keep == None:
+                            continue
                         for i, line in enumerate(to_keep):
                             to_keep[i] = line.replace("\n", "").replace("\t", "    ")
                         last_saved = commands[1]
