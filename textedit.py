@@ -2,7 +2,7 @@ import filesystem_selector
 import syntax
 import os
 import time
-import tui
+import tgfx
 
 tui.hide_cursor()
 
@@ -13,8 +13,6 @@ position = [0, 0]
 running = True
 cursor_blink = time.time()
 last_saved = None
-last_time_saved = time.time()
-last_saved_contents = None
 
 color_table = {
     "alnum" : (226, 212, 186),
@@ -22,8 +20,6 @@ color_table = {
     "other" : (141, 128, 173),
     "double_string" : (226, 109, 90),
     "single_string" : (173, 50, 31),
-    "incomplete_double_string" : (226 // 2, 109 // 2, 90 // 2),
-    "incomplete_double_string" : (173 // 2, 50 // 2, 31 // 2),
     "keyword" : (24*2, 54*2, 66*2),
     "comment" : (3*3, 25*3, 39*3),
     "escapes" : (173 // 2, 50 // 2, 31 // 2)
@@ -47,29 +43,7 @@ def apply_quickfixes():
     if position[0] > len(lines[position[1]]): position[0] = len(lines[position[1]])
 
 def write_file(filename, backup=True):
-    open(f"{'.' if backup else ''}{filename}{".ate" if backup else ""}", "w", encoding='utf-8').write("\n".join(lines))
-
-def check_backup(filename):
-    if not os.path.exists(str(filename)):
-        canvas.message("That file doesn't exist!")
-        return None
-    
-    normal_contents = open(f"{filename}", "r", encoding='utf-8').readlines()
-
-    swap_contents = normal_contents
-    if os.path.exists(f".{filename}.ate"):
-        swap_contents = open(f".{filename}.ate", "r", encoding='utf-8').readlines()
-
-    to_keep = normal_contents
-    if swap_contents != normal_contents:
-        canvas.clear()
-        query_results = canvas.bool_query("Swap contents do not match file contents. KEEP the SWAP (y/n)? ")
-        canvas.print()
-    
-    if query_results:
-        to_keep = swap_contents
-
-    return to_keep
+    open(f"{filename}{".ate" if backup else ""}", "w", encoding='utf-8').write("\n".join(lines))
 
 def find_all_indexes(text, sub):
     indexes = []
@@ -83,11 +57,6 @@ def find_all_indexes(text, sub):
     return indexes
 
 while running:
-    if last_saved_contents != "\n".join(lines) and (time.time() - last_time_saved) > 2:
-        last_time_saved = time.time()
-        last_saved_contents = "\n".join(lines)
-        write_file('unnamed' if last_saved == None else last_saved)
-    
     pressed_key = tui.getkey()
     if pressed_key != None and "Arrow" in pressed_key:
         cursor_blink = time.time()
@@ -144,11 +113,9 @@ while running:
                         else:
                             open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
                     case "read" | "r" | "open" | "get":
-                        to_keep = check_backup(commands[1])
-                        if to_keep == None:
-                            continue
-                        for i, line in enumerate(to_keep):
-                            to_keep[i] = line.replace("\n", "").replace("\t", "    ")
+                        lines = open(commands[1], "r", encoding='utf-8').readlines()
+                        for i, line in enumerate(lines):
+                            lines[i] = line.replace("\n", "").replace("\t", "    ")
                         last_saved = commands[1]
                     case "mount" | "dir" | "cd" | "chdir":
                         os.chdir(commands[1])
@@ -217,11 +184,7 @@ while running:
         canvas.plot(position[0] + shift, position[1], fill="|")
     center_y = (position[1] + round(canvas.size[1] / 2))
     canvas.move((canvas.size[0] - position[0] - shift - 5 if (position[0] + shift) > canvas.size[0] else 0, canvas.size[1] - center_y if center_y > canvas.size[1] else 0))
-
-    last_backed_up = f"(last backed up {round((time.time() - last_time_saved) / 10) * 10} seconds ago)"
-    file_info = f"Lines: {len(lines)}, {"unsaved" if last_saved == None else last_saved}"
-
-    canvas.put((0, canvas.size[1] - 1), f"{file_info} {last_backed_up} | ATE v2.2.0 {' ' * canvas.size[0]}", color=(227, 193, 111))
+    canvas.put((0, canvas.size[1] - 1), f"Lines: {len(lines)}, {"unsaved" if last_saved == None else last_saved} | ATE v2.2.0 {' ' * canvas.size[0]}", color=(227, 193, 111))
     canvas.print()
 
-# time.sleep(1)
+time.sleep(1)

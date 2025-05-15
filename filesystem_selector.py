@@ -1,4 +1,4 @@
-import tui
+import tgfx
 import os
 
 files = os.listdir(os.getcwd())

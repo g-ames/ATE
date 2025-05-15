@@ -41,10 +41,10 @@ class Token():
     def infer_type(self):
         if self.text == None or self.text == "": return
         
-        if self.text.startswith('"'):
-            self.data_type = "double_string" if self.text.endswith('"') else "incomplete_double_string"
-        elif self.text.startswith("'") and self.text.endswith("'"):
-            self.data_type = "single_string" if self.text.endswith("'") else "incomplete_single_string"
+        if self.text.startswith('"') and self.text.endswith('"') and len(self.text) > 1:
+            self.data_type = "double_string"
+        elif self.text.startswith("'") and self.text.endswith("'") and len(self.text) > 1:
+            self.data_type = "single_string"
         else:
             self.data_type = get_character_type(self.text[0])
             if self.data_type == "alnum" and self.text in keywords:
