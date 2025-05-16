@@ -238,7 +238,7 @@ class Canvas():
             self.plot_color(x, y, color=color)
     def plot_color(self, x, y, color=None):
         self.data[(round(x), round(y))] = f"{'' if color == None else rgb_ansi(color)}{self.data[(round(x), round(y))]}{RESET_COLOR}"
-    def rect(self, pos, size, fill="*", color=None):
+    def rect(self, x, y, w, h, fill="*", color=None):
         for xi in range(w):
             for yi in range(h):
                 self.plot(xi + x, yi + y, fill=fill, color=color)

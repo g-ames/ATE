@@ -1,3 +1,5 @@
+_print = print
+
 import tgfx
 
 canvas = tgfx.Canvas()
@@ -10,8 +12,10 @@ class Vector2():
 class Dim():
     def __init__(self, x, y, percent_x, percent_y):
         self.pixels = Vector2(x, y)
-        self.percents = Vector2(percent_x, percent_x)
+        self.percents = Vector2(percent_x, percent_y)
     def vectorize(self):
+        _print(self.percents.x, self.percents.y, self.percents.x * canvas.size[0], self.percents.y * canvas.size[1])
+        quit()
         return Vector2(self.pixels.x + (self.percents.x * canvas.size[0]), self.pixels.y + (self.percents.y * canvas.size[1]))
 
 class UIElement():
@@ -30,6 +34,15 @@ class UIElement():
         vectorized_position.y += offset.y
         
         vectorized_size = self.size.vectorize()
+
+        canvas.message(f"""
+            {vectorized_position.x}, 
+            {vectorized_position.y}, 
+            {vectorized_size.x}, 
+            {vectorized_size.y}, 
+            {self.fill},
+            {self.color}""")
+
         canvas.rect(
             vectorized_position.x, 
             vectorized_position.y, 
@@ -39,7 +52,7 @@ class UIElement():
             color=self.color
         )
 
-        for child in children:
+        for child in self.children:
             child.render(vectorized_position)
 
 root = UIElement(Dim(0, 0, 0, 0), Dim(0, 1, 0, 1))
