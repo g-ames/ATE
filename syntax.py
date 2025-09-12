@@ -30,6 +30,7 @@ keywords = [
     "else",
     "elif",
     "from"
+    "match"
 ]
 
 class Token():

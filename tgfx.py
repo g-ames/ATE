@@ -48,7 +48,7 @@ def print(then="", remove=0, end="\n", mode='individually', similarity=1, pixel_
 
     if mode == "batch":
         # Clear the specified number of lines above the current one
-        removal = '\033[F\033[K' * remove if remove > 0 else ''
+        removal = '\x1B[F\x1B[K' * remove if remove > 0 else ''
         sys.stdout.write(f"{removal}{then}{end}")
         sys.stdout.flush()
         return
@@ -64,7 +64,7 @@ def print(then="", remove=0, end="\n", mode='individually', similarity=1, pixel_
 
     # "individually" mode: Clear each line separately
     if remove:
-        output('\033[F' * remove)
+        output('\x1B[F' * remove)
 
     # Print each line individually after clearing
     lines = then.split('\n')
@@ -72,13 +72,13 @@ def print(then="", remove=0, end="\n", mode='individually', similarity=1, pixel_
         interlace_ticker = not interlace_ticker
         if i in line_buffer:
             if line_buffer[i] == line or (similarity != None and (string_similarity(line, line_buffer[i]) > similarity)): # check how close they are!!!
-                output("\033[B") # ie if the line is the same as it was the last frame, don't change it!
+                output("\x1B[B") # ie if the line is the same as it was the last frame, don't change it!
                 continue
         if interlace and interlace_ticker:
-            output("\033[B")
+            output("\x1B[B")
             continue
         line_buffer[i] = line
-        output("\033[K" + line)
+        output("\x1B[K" + line)
         if i < len(lines) - 1 or end == "\n":
             output("\n")
     if end != "\n":
@@ -93,6 +93,9 @@ class TextImage():
         self.as_text = as_text
         self.escapes = escapes
 
+def colorify(text, color):
+    return f"{rgb_ansi(color)}{text}{RESET_COLOR}"
+
 class ImageConverter():
     def __init__(self):
         self.color = "rgb"
@@ -104,6 +107,7 @@ class ImageConverter():
         self.color_multiplier = [1, 1, 1]
         self.maximum_dimension = 25
         self.size = (25, 25) 
+        self.return_text = True
     def convert(self, width, height, pixels):
         gradient = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "[::-1]
 
@@ -134,12 +138,18 @@ class ImageConverter():
                     if last_color_insertion != color_insertion:
                         value = f"\u001b[38;2;{round(color_insertion[0]*self.color_multiplier[0])};{round(color_insertion[1]*self.color_multiplier[1])};{round(color_insertion[2]*self.color_multiplier[2])}m"
                         if last_color_insertion == None: # Color closeness
-                            escapes[(x, y)] = value
+                            if self.return_text:
+                                res += value
+                            else:
+                                escapes[(x, y)] = value
                             # res += value
                         else:
                             difference = abs(color_insertion[0] - last_color_insertion[0]) + abs(color_insertion[1] - last_color_insertion[1]) + abs(color_insertion[2] - last_color_insertion[2])
                             if difference > self.color_closeness:
-                                escapes[(x, y)] = value
+                                if self.return_text:
+                                    res += value
+                                else:
+                                    escapes[(x, y)] = value
                                 # res += value
                     last_color_insertion = color_insertion
                 
@@ -197,10 +207,10 @@ def getkey():
     return None
 
 def hide_cursor():
-    print('\033[?25l', end="")
+    print('\x1B[?25l', end="")
 
 def show_cursor():
-    print('\033[?25h', end="")
+    print('\x1B[?25h', end="")
 
 import types
 import traceback
@@ -352,3 +362,5 @@ class Canvas():
                 valid_response = True
                 response = False
         return response
+    def is_empty(self, pos):
+        return not (round(pos[0]), round(pos[1])) in self.data

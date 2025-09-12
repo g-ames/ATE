@@ -2,7 +2,9 @@ import filesystem_selector
 import syntax
 import os
 import time
-import tgfx
+import tgfx as tui
+import converter
+import importlib # extensions support
 
 tui.hide_cursor()
 
@@ -13,6 +15,8 @@ position = [0, 0]
 running = True
 cursor_blink = time.time()
 last_saved = None
+extensions = []
+images = []
 
 color_table = {
     "alnum" : (226, 212, 186),
@@ -29,6 +33,7 @@ special_colorizations = {
     "True" : (10, 205, 255),
     "False" : (10, 205, 255),
     "true" : (10, 205, 255),
+    "None": (10, 205, 255),
     "false" : (10, 205, 255),
     "null" : (82, 43, 41),
     "enumerate" : (173, 50, 31),
@@ -43,7 +48,10 @@ def apply_quickfixes():
     if position[0] > len(lines[position[1]]): position[0] = len(lines[position[1]])
 
 def write_file(filename, backup=True):
-    open(f"{filename}{".ate" if backup else ""}", "w", encoding='utf-8').write("\n".join(lines))
+    global lines
+    if backup:
+        open(f".{filename}.ate", "w", encoding='utf-8').write("\n".join(lines))
+    open(f"{filename}", "w", encoding='utf-8').write("\n".join(lines))
 
 def find_all_indexes(text, sub):
     indexes = []
@@ -88,8 +96,15 @@ while running:
             
             if commands.startswith("!"):
                 print('\n'*canvas.size[1])
-                os.system(f"{commands[1:]}")
-                input("PRESS ENTER TO CONTINUE")
+
+                try:
+                    os.system(f"{commands[1:]}")
+                    input("PRESS ENTER TO CONTINUE")
+                except KeyboardInterrupt:
+                    pass
+                except Exception as e:
+                    quit(f"Error: {e}")
+
                 print('\n'*canvas.size[1])
                 continue
             
@@ -105,6 +120,13 @@ while running:
                                 open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
                         running = False
                     case "write" | "w":
+                        if len(commands) == 1:
+                            if last_saved == None:
+                                canvas.message(f"No file to save to. Use 'write [filename]'.")
+                            else:
+                                open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
+                                continue
+                            continue
                         open(commands[1], "w", encoding='utf-8').write("\n".join(lines))
                         last_saved = commands[1]
                     case "save" | "s":
@@ -127,6 +149,20 @@ while running:
                         for i, line in enumerate(lines):
                             lines[i] = line.replace("\n", "").replace("\t", "    ")
                         last_saved = filename
+                    case "extension" | "ext":
+                        extensions.append(importlib.import_module(f"{commands[1]}"))
+                    case "img":
+                        if len(commands) == 1:
+                            canvas.message("You need to provide a path to an image!")
+                            continue
+                        try:
+                            img_text = converter.convert_image(commands[1])
+                            for line in img_text.split("\n"):
+                                lines.insert(position[1], line)
+                                position[1] += 1
+                            position[0] = 0
+                        except Exception as e:
+                            canvas.message(f"Error converting image: {e}", color=(255, 0, 0))
                     case _:
                         canvas.message("That's not a command!", color=(255, 0, 0))
 
@@ -149,6 +185,9 @@ while running:
             position[0] += len(pressed_key)
     apply_quickfixes()
     canvas.clear()
+
+    for extension in extensions:
+        extension.pretick(canvas)
 
     for i, line in enumerate(lines):
         index_text = f" {i} "
@@ -185,6 +224,10 @@ while running:
     center_y = (position[1] + round(canvas.size[1] / 2))
     canvas.move((canvas.size[0] - position[0] - shift - 5 if (position[0] + shift) > canvas.size[0] else 0, canvas.size[1] - center_y if center_y > canvas.size[1] else 0))
     canvas.put((0, canvas.size[1] - 1), f"Lines: {len(lines)}, {"unsaved" if last_saved == None else last_saved} | ATE v2.2.0 {' ' * canvas.size[0]}", color=(227, 193, 111))
+
+    for extension in extensions:
+        extension.posttick(canvas)
+
     canvas.print()
 
 time.sleep(1)

@@ -1,4 +1,4 @@
-import tgfx
+import tgfx as tui
 import os
 
 files = os.listdir(os.getcwd())
@@ -27,7 +27,7 @@ def take(canvas):
         canvas.clear()
         canvas.put((0, 0), cwd)
         for fi, file in enumerate(files):
-            selection_color = ((0, 0, 255) if fi != selected else (255, 0, 0))
+            selection_color = ((100, 100, 255) if fi != selected else (255, 100, 100))
             canvas.put((5, fi + 1), f"{str(file)}{" " * (max([len(x) for x in files])+1 - len(str(file)))}{"(directory)" if os.path.isdir(file) else '(file)'}", color=selection_color)
         canvas.print()
     
