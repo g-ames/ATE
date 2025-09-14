@@ -37,7 +37,10 @@ special_colorizations = {
     "false" : (10, 205, 255),
     "null" : (82, 43, 41),
     "enumerate" : (173, 50, 31),
-    "\"Hello, World!\"" : (226, 109, 200)
+    "\"Hello, World!\"" : (226, 109, 200),
+    "=": (161, 148, 193),
+    ">": (161, 148, 193),
+    "<": (161, 148, 193)
 }
 
 def apply_quickfixes():
@@ -70,6 +73,11 @@ while running:
         cursor_blink = time.time()
     match pressed_key:
         case None: pass
+        case "PageUp" | "PageDown":
+            position[1] += canvas.size[1] * (-1 if pressed_key == "PageUp" else 1)
+            # if it is bigger than the number of lines, just go to the end
+            if position[1] >= len(lines):
+                position[1] = len(lines) - 1
         case "UpArrow" | "Control+UpArrow": position[1] -= 1
         case "DownArrow" | "Control+DownArrow": position[1] += 1
         case "LeftArrow" | "Control+LeftArrow": 
@@ -110,6 +118,11 @@ while running:
             
             commands_list = commands.lower().split(";")
             for commands in commands_list:
+                if commands.strip() == "":
+                    continue
+                else:
+                    commands = commands.strip()
+
                 commands = commands.split(" ")
                 match commands[0]:
                     case "quit" | "exit" | "q" | "ex":
@@ -139,16 +152,20 @@ while running:
                         for i, line in enumerate(lines):
                             lines[i] = line.replace("\n", "").replace("\t", "    ")
                         last_saved = commands[1]
+                        position = [0, 0]
                     case "mount" | "dir" | "cd" | "chdir":
                         os.chdir(commands[1])
                     case "cwd":
                         canvas.message(f"cwd: {os.getcwd()}")
                     case "fs" | "filesystem" | "files":
                         filename = filesystem_selector.take(canvas)
+                        if filename == None:
+                            continue
                         lines = open(filename, "r", encoding='utf-8').readlines()
                         for i, line in enumerate(lines):
                             lines[i] = line.replace("\n", "").replace("\t", "    ")
                         last_saved = filename
+                        position = [0, 0]
                     case "extension" | "ext":
                         extensions.append(importlib.import_module(f"{commands[1]}"))
                     case "img":
@@ -201,6 +218,9 @@ while running:
         offset = len(f" {len(lines)} ")
         is_comment = False
         for ti, token in enumerate(tokens):
+            # first, check if it is even on the screen
+            if offset > canvas.size[0]:
+                break
             # canvas.put((offset, i), line, color=line_highlight)
             if token.text == "#" or (token.text == "/" and len(tokens) > ti+1 and tokens[ti+1].text == "/"):
                 is_comment = True

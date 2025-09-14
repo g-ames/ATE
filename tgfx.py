@@ -108,56 +108,80 @@ class ImageConverter():
         self.maximum_dimension = 25
         self.size = (25, 25) 
         self.return_text = True
+    # def convert(self, width, height, pixels):
+    #     gradient = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "[::-1]
+
+    #     if self.character_gradient != None:
+    #         gradient = self.character_gradient
+
+    #     res = ""
+    #     skip_ticker = 0
+    #     color_ticker = 0
+    #     color_insertion = None
+    #     last_color_insertion = None
+    #     escapes = {}
+
+    #     for y in range(height):
+    #         skip_ticker += 1
+    #         if skip_ticker == self.skip_every:
+    #             skip_ticker = 0
+    #             res += "\n"
+    #             continue
+    #         for x in range(width):
+    #             px = pixels[x, y]
+    #             bw = ((px[0]+px[1]+px[2])/3)/255
+                
+    #             color_ticker += 1
+    #             if self.color == "rgb" and color_ticker >= self.color_every:
+    #                 color_ticker = 0
+    #                 color_insertion = [round(px[0] / self.color_divisor) * self.color_divisor, round(px[1] / self.color_divisor) * self.color_divisor, round(px[2] / self.color_divisor) * self.color_divisor]
+    #                 if last_color_insertion != color_insertion:
+    #                     value = f"\u001b[38;2;{round(color_insertion[0]*self.color_multiplier[0])};{round(color_insertion[1]*self.color_multiplier[1])};{round(color_insertion[2]*self.color_multiplier[2])}m"
+    #                     if last_color_insertion == None: # Color closeness
+    #                         if self.return_text:
+    #                             res += value
+    #                         else:
+    #                             escapes[(x, y)] = value
+    #                         # res += value
+    #                     else:
+    #                         difference = abs(color_insertion[0] - last_color_insertion[0]) + abs(color_insertion[1] - last_color_insertion[1]) + abs(color_insertion[2] - last_color_insertion[2])
+    #                         if difference > self.color_closeness:
+    #                             if self.return_text:
+    #                                 res += value
+    #                             else:
+    #                                 escapes[(x, y)] = value
+    #                             # res += value
+    #                 last_color_insertion = color_insertion
+                
+    #             res += gradient[round(bw * (len(gradient)-1))]
+    #         res += "\n"
+        
+    #     if self.color != None:
+    #         res += "\u001b[0m"
+
+    #     return TextImage(res, escapes)
     def convert(self, width, height, pixels):
-        gradient = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "[::-1]
-
-        if self.character_gradient != None:
-            gradient = self.character_gradient
-
         res = ""
-        skip_ticker = 0
-        color_ticker = 0
-        color_insertion = None
-        last_color_insertion = None
         escapes = {}
 
-        for y in range(height):
-            skip_ticker += 1
-            if skip_ticker == self.skip_every:
-                skip_ticker = 0
-                res += "\n"
-                continue
+        # Use half-block chars, so we step in pairs of vertical pixels
+        for y in range(0, height, 2):
             for x in range(width):
-                px = pixels[x, y]
-                bw = ((px[0]+px[1]+px[2])/3)/255
-                
-                color_ticker += 1
-                if self.color == "rgb" and color_ticker >= self.color_every:
-                    color_ticker = 0
-                    color_insertion = [round(px[0] / self.color_divisor) * self.color_divisor, round(px[1] / self.color_divisor) * self.color_divisor, round(px[2] / self.color_divisor) * self.color_divisor]
-                    if last_color_insertion != color_insertion:
-                        value = f"\u001b[38;2;{round(color_insertion[0]*self.color_multiplier[0])};{round(color_insertion[1]*self.color_multiplier[1])};{round(color_insertion[2]*self.color_multiplier[2])}m"
-                        if last_color_insertion == None: # Color closeness
-                            if self.return_text:
-                                res += value
-                            else:
-                                escapes[(x, y)] = value
-                            # res += value
-                        else:
-                            difference = abs(color_insertion[0] - last_color_insertion[0]) + abs(color_insertion[1] - last_color_insertion[1]) + abs(color_insertion[2] - last_color_insertion[2])
-                            if difference > self.color_closeness:
-                                if self.return_text:
-                                    res += value
-                                else:
-                                    escapes[(x, y)] = value
-                                # res += value
-                    last_color_insertion = color_insertion
-                
-                res += gradient[round(bw * (len(gradient)-1))]
-            res += "\n"
-        
-        if self.color != None:
-            res += "\u001b[0m"
+                # Get upper and lower pixel
+                upper = pixels[x, y]
+                lower = pixels[x, y + 1] if y + 1 < height else (0, 0, 0)
+
+                # Build ANSI escape: foreground = upper, background = lower
+                fg = f"\u001b[38;2;{upper[0]};{upper[1]};{upper[2]}m"
+                bg = f"\u001b[48;2;{lower[0]};{lower[1]};{lower[2]}m"
+
+                if self.return_text:
+                    res += fg + bg + "▀"
+                else:
+                    escapes[(x, y)] = fg + bg
+                    res += "▀"
+
+            res += "\u001b[0m\n"  # reset at end of row
 
         return TextImage(res, escapes)
     def convert_image_file(self, filename, color='rgb'):
@@ -181,14 +205,18 @@ class ImageConverter():
 
 # Windows only... sorry.
 import msvcrt
-def getkey():
+
+def getkey(blocking=False):
+    if blocking:
+        while not msvcrt.kbhit():
+            time.sleep(0.01)
+    
     if msvcrt.kbhit():
         char = msvcrt.getch()
         if char == b'\x1b':
             return "Escape"
         elif char == b'\xe0':
             char_after = msvcrt.getch()
-            # print(char_after) 
             match char_after:
                 case b'H': 
                     return "UpArrow"
@@ -198,13 +226,22 @@ def getkey():
                     return "DownArrow"
                 case b'M': 
                     return "RightArrow"
-                case b'\x8d': return "Control+UpArrow"
-                case b's': return "Control+LeftArrow"
-                case b'\x91': return "Control+DownArrow"
-                case b't': return "Control+RightArrow"
+                case b'\x8d': 
+                    return "Control+UpArrow"
+                case b's': 
+                    return "Control+LeftArrow"
+                case b'\x91': 
+                    return "Control+DownArrow"
+                case b't': 
+                    return "Control+RightArrow"
+                case b'I': 
+                    return "PageUp"
+                case b'Q': 
+                    return "PageDown"
         else:
-            return char.decode('ASCII')
+            return char.decode('ASCII', errors='ignore')
     return None
+
 
 def hide_cursor():
     print('\x1B[?25l', end="")

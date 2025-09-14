@@ -11,6 +11,7 @@ def get_character_type(char):
         return "other"
 
 keywords = [
+    "from",
     "while", 
     "for", 
     "def", 
@@ -31,6 +32,22 @@ keywords = [
     "elif",
     "from"
     "match"
+    "require",
+    "goto",
+    "func",
+    "type",
+    "var",
+    "let",
+    "defer",
+    "package"
+    "global",
+    "match",
+    "case"
+    "try",
+    "except",
+    "continue",
+    "break",
+    "const"
 ]
 
 class Token():
