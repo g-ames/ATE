@@ -33,10 +33,10 @@ def get_frame(w, h, shifting):
 
     return r, g, b
 
-def pretick(canvas):
+def pretick(canvas, _):
     return
 
-def posttick(canvas):
+def posttick(canvas, _):
     global shifting
     w, h = tgfx.get_terminal_size()
     r, g, b = get_frame(w, h, shifting)

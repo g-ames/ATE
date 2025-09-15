@@ -1,4 +1,3 @@
-
 import os
 import sys
 import random
@@ -42,7 +41,8 @@ def string_similarity(string1, string2):
 internal_buffer = ""
 line_buffer = {}
 interlace_ticker = False
-def print(then="", remove=0, end="\n", mode='individually', similarity=1, pixel_based=False, interlace=False):
+TGFX_GLOBAL_PRINT_MODE = 'individually'
+def print(then="", remove=0, end="\n", mode=TGFX_GLOBAL_PRINT_MODE, similarity=1, pixel_based=False, interlace=False):
     then = str(then)
     global internal_buffer, interlace_ticker, line_buffer
 
@@ -203,45 +203,93 @@ class ImageConverter():
 
         return self.convert(new_width, new_height, pixels)
 
-# Windows only... sorry.
-import msvcrt
+import sys
+import time
 
-def getkey(blocking=False):
-    if blocking:
-        while not msvcrt.kbhit():
-            time.sleep(0.01)
-    
-    if msvcrt.kbhit():
-        char = msvcrt.getch()
-        if char == b'\x1b':
-            return "Escape"
-        elif char == b'\xe0':
-            char_after = msvcrt.getch()
-            match char_after:
-                case b'H': 
-                    return "UpArrow"
-                case b'K': 
-                    return "LeftArrow"
-                case b'P': 
-                    return "DownArrow"
-                case b'M': 
-                    return "RightArrow"
-                case b'\x8d': 
-                    return "Control+UpArrow"
-                case b's': 
-                    return "Control+LeftArrow"
-                case b'\x91': 
-                    return "Control+DownArrow"
-                case b't': 
-                    return "Control+RightArrow"
-                case b'I': 
-                    return "PageUp"
-                case b'Q': 
-                    return "PageDown"
-        else:
-            return char.decode('ASCII', errors='ignore')
-    return None
+if sys.platform.startswith("win"):
+    import msvcrt
 
+    def getkey(blocking=False):
+        if blocking:
+            while not msvcrt.kbhit():
+                time.sleep(0.01)
+        
+        if msvcrt.kbhit():
+            char = msvcrt.getch()
+            if char == b'\x08':  # Backspace
+                return "\b"
+            elif char == b'\x1b':
+                return "Escape"
+            elif char == b'\xe0':
+                char_after = msvcrt.getch()
+                match char_after:
+                    case b'H': return "UpArrow"
+                    case b'K': return "LeftArrow"
+                    case b'P': return "DownArrow"
+                    case b'M': return "RightArrow"
+                    case b'\x8d': return "Control+UpArrow"
+                    case b's': return "Control+LeftArrow"
+                    case b'\x91': return "Control+DownArrow"
+                    case b't': return "Control+RightArrow"
+                    case b'I': return "PageUp"
+                    case b'Q': return "PageDown"
+            else:
+                return char.decode('ASCII', errors='ignore')
+        return None
+
+else:  # Linux / macOS
+    import tty
+    import termios
+    import select
+
+    def getkey(blocking=False):
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            if blocking or select.select([sys.stdin], [], [], 0.01)[0]:
+                char = sys.stdin.read(1)
+                
+                if char == '\x7f':  # Backspace
+                    return "\b"
+                
+                if char == '\x1b':  # Escape sequences
+                    try:
+                        seq = sys.stdin.read(2)
+                        if seq == '[A':
+                            return "UpArrow"
+                        elif seq == '[B':
+                            return "DownArrow"
+                        elif seq == '[C':
+                            return "RightArrow"
+                        elif seq == '[D':
+                            return "LeftArrow"
+                        elif seq == '[5':
+                            sys.stdin.read(1) # reads the trailing '~'
+                            return "PageUp"
+                        elif seq == '[6':
+                            sys.stdin.read(1) # reads the trailing '~'
+                            return "PageDown"
+                        
+                        # Handle Ctrl + Arrow keys
+                        # These often have a third character in the sequence
+                        elif seq == '[1':
+                            if sys.stdin.read(1) == ';':
+                                third_char = sys.stdin.read(1)
+                                fourth_char = sys.stdin.read(1)
+                                if third_char == '5':
+                                    if fourth_char == 'A': return "Control+UpArrow"
+                                    if fourth_char == 'B': return "Control+DownArrow"
+                                    if fourth_char == 'C': return "Control+RightArrow"
+                                    if fourth_char == 'D': return "Control+LeftArrow"
+                    except IOError:
+                        pass # Handles case where escape sequence is incomplete
+                    return "Escape"
+                else:
+                    return char
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return None
 
 def hide_cursor():
     print('\x1B[?25l', end="")
@@ -333,8 +381,14 @@ class Canvas():
             res[key] = item
         self.data = res
     def put(self, pos, text, color=None):
+        shift_y = 0
+        shift_x = 0
         for i, char in enumerate(text):
-            self.plot(i + pos[0], pos[1], fill=char, color=color)
+            if char == "\n":
+                shift_x = -i - 1
+                shift_y += 1
+                continue
+            self.plot(i + pos[0] + shift_x, pos[1] + shift_y, fill=char, color=color)
     def image(self, pos, size, image_filename):
         self.image_converter.size = size
         text_image = self.image_converter.convert_image_file(image_filename)
@@ -387,6 +441,8 @@ class Canvas():
                 line_buffer = {}
             self.size = get_terminal_size()
             self.size = (self.size[0], self.size[1] - 1)
+
+        time.sleep(0.01)
     def bool_query(self, text):
         valid_response = False
         response = None

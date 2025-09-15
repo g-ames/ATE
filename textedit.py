@@ -69,142 +69,155 @@ def find_all_indexes(text, sub):
 
 while running:
     pressed_key = tui.getkey()
-    if pressed_key != None and "Arrow" in pressed_key:
-        cursor_blink = time.time()
-    match pressed_key:
-        case None: pass
-        case "PageUp" | "PageDown":
-            position[1] += canvas.size[1] * (-1 if pressed_key == "PageUp" else 1)
-            # if it is bigger than the number of lines, just go to the end
-            if position[1] >= len(lines):
-                position[1] = len(lines) - 1
-        case "UpArrow" | "Control+UpArrow": position[1] -= 1
-        case "DownArrow" | "Control+DownArrow": position[1] += 1
-        case "LeftArrow" | "Control+LeftArrow": 
-            position[0] -= 1
-            current_line = lines[position[1]]
-            if "Control+" in pressed_key:
-                while current_line[position[0]] != " " and not position[0] == 0:
-                    position[0] -= 1
-        case "RightArrow" | "Control+RightArrow": 
-            position[0] += 1
-            current_line = lines[position[1]]
-            if "Control+" in pressed_key:
-                while (not position[0] >= len(current_line)) and current_line[position[0]] != " ":
-                    position[0] += 1
-        case '\r': 
-            before = lines[position[1]]
-            lines[position[1]] = before[0:position[0]]
-            lines.insert(position[1]+1, before[position[0]:len(before)])
+    while pressed_key != None:
+        if pressed_key != None and "Arrow" in pressed_key:
+            cursor_blink = time.time()
+        match pressed_key:
+            case None: pass
+            case "PageUp" | "PageDown":
+                position[1] += canvas.size[1] * (-1 if pressed_key == "PageUp" else 1)
+                # if it is bigger than the number of lines, just go to the end
+                if position[1] >= len(lines):
+                    position[1] = len(lines) - 1
+            case "UpArrow" | "Control+UpArrow": position[1] -= 1
+            case "DownArrow" | "Control+DownArrow": position[1] += 1
+            case "LeftArrow" | "Control+LeftArrow": 
+                position[0] -= 1
+                current_line = lines[position[1]]
+                if "Control+" in pressed_key:
+                    if position[0] < 0:
+                        continue
+                    while current_line[position[0]] != " " and not position[0] == 0:
+                        position[0] -= 1
+                        if position[0] < 0:
+                            break
+            case "RightArrow" | "Control+RightArrow": 
+                position[0] += 1
+                current_line = lines[position[1]]
+                if "Control+" in pressed_key:
+                    while (not position[0] >= len(current_line)) and current_line[position[0]] != " ":
+                        position[0] += 1
+            case '\r': 
+                before = lines[position[1]]
+                lines[position[1]] = before[0:position[0]]
+                lines.insert(position[1]+1, before[position[0]:len(before)])
 
-            position[0] = 0
-            position[1] += 1
-        case "Escape":
-            commands = canvas.input()
-            
-            if commands.startswith("!"):
-                print('\n'*canvas.size[1])
+                position[0] = 0
+                position[1] += 1
+            case "Escape":
+                commands = canvas.input()
+                
+                if commands.startswith("!") or commands.startswith("!!"):
+                    wait_enter = True
+                    if commands.startswith("!!"):
+                        commands = commands[1:]
+                        wait_enter = False
+                    
+                    print('\n'*canvas.size[1])
 
-                try:
-                    os.system(f"{commands[1:]}")
-                    input("PRESS ENTER TO CONTINUE")
-                except KeyboardInterrupt:
-                    pass
-                except Exception as e:
-                    quit(f"Error: {e}")
+                    try:
+                        os.system(f"{commands[1:]}")
+                        if wait_enter: input("PRESS ENTER TO CONTINUE")
+                        canvas.clear()
+                        canvas.print()
+                    except KeyboardInterrupt:
+                        pass
+                    except Exception as e:
+                        quit(f"Error: {e}")
 
-                print('\n'*canvas.size[1])
-                continue
-            
-            commands_list = commands.lower().split(";")
-            for commands in commands_list:
-                if commands.strip() == "":
+                    print('\n'*canvas.size[1])
                     continue
-                else:
-                    commands = commands.strip()
+                
+                commands_list = commands.lower().split(";")
+                for commands in commands_list:
+                    if commands.strip() == "":
+                        continue
+                    else:
+                        commands = commands.strip()
 
-                commands = commands.split(" ")
-                match commands[0]:
-                    case "quit" | "exit" | "q" | "ex":
-                        if commands[0] == "exit" or commands[0] == "ex": # unlike quit, this includes saving
-                            open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
-                        else:
-                            if not canvas.bool_query("Are you sure you don't want to save? "):
+                    commands = commands.split(" ")
+                    match commands[0]:
+                        case "quit" | "exit" | "q" | "ex":
+                            if commands[0] == "exit" or commands[0] == "ex": # unlike quit, this includes saving
                                 open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
-                        running = False
-                    case "write" | "w":
-                        if len(commands) == 1:
+                            else:
+                                if not canvas.bool_query("Are you sure you don't want to save? "):
+                                    open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
+                            running = False
+                        case "write" | "w":
+                            if len(commands) == 1:
+                                if last_saved == None:
+                                    canvas.message(f"No file to save to. Use 'write [filename]'.")
+                                else:
+                                    open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
+                                    continue
+                                continue
+                            open(commands[1], "w", encoding='utf-8').write("\n".join(lines))
+                            last_saved = commands[1]
+                        case "save" | "s":
                             if last_saved == None:
                                 canvas.message(f"No file to save to. Use 'write [filename]'.")
                             else:
                                 open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
+                        case "read" | "r" | "open" | "get":
+                            lines = open(commands[1], "r", encoding='utf-8').readlines()
+                            for i, line in enumerate(lines):
+                                lines[i] = line.replace("\n", "").replace("\t", "    ")
+                            last_saved = commands[1]
+                            position = [0, 0]
+                        case "mount" | "dir" | "cd" | "chdir":
+                            os.chdir(commands[1])
+                        case "cwd":
+                            canvas.message(f"cwd: {os.getcwd()}")
+                        case "fs" | "filesystem" | "files":
+                            filename = filesystem_selector.take(canvas)
+                            if filename == None:
                                 continue
-                            continue
-                        open(commands[1], "w", encoding='utf-8').write("\n".join(lines))
-                        last_saved = commands[1]
-                    case "save" | "s":
-                        if last_saved == None:
-                            canvas.message(f"No file to save to. Use 'write [filename]'.")
-                        else:
-                            open(last_saved, "w", encoding='utf-8').write("\n".join(lines))
-                    case "read" | "r" | "open" | "get":
-                        lines = open(commands[1], "r", encoding='utf-8').readlines()
-                        for i, line in enumerate(lines):
-                            lines[i] = line.replace("\n", "").replace("\t", "    ")
-                        last_saved = commands[1]
-                        position = [0, 0]
-                    case "mount" | "dir" | "cd" | "chdir":
-                        os.chdir(commands[1])
-                    case "cwd":
-                        canvas.message(f"cwd: {os.getcwd()}")
-                    case "fs" | "filesystem" | "files":
-                        filename = filesystem_selector.take(canvas)
-                        if filename == None:
-                            continue
-                        lines = open(filename, "r", encoding='utf-8').readlines()
-                        for i, line in enumerate(lines):
-                            lines[i] = line.replace("\n", "").replace("\t", "    ")
-                        last_saved = filename
-                        position = [0, 0]
-                    case "extension" | "ext":
-                        extensions.append(importlib.import_module(f"{commands[1]}"))
-                    case "img":
-                        if len(commands) == 1:
-                            canvas.message("You need to provide a path to an image!")
-                            continue
-                        try:
-                            img_text = converter.convert_image(commands[1])
-                            for line in img_text.split("\n"):
-                                lines.insert(position[1], line)
-                                position[1] += 1
-                            position[0] = 0
-                        except Exception as e:
-                            canvas.message(f"Error converting image: {e}", color=(255, 0, 0))
-                    case _:
-                        canvas.message("That's not a command!", color=(255, 0, 0))
+                            lines = open(filename, "r", encoding='utf-8').readlines()
+                            for i, line in enumerate(lines):
+                                lines[i] = line.replace("\n", "").replace("\t", "    ")
+                            last_saved = filename
+                            position = [0, 0]
+                        case "extension" | "ext":
+                            extensions.append(importlib.import_module(f"{commands[1]}"))
+                        case "img":
+                            if len(commands) == 1:
+                                canvas.message("You need to provide a path to an image!")
+                                continue
+                            try:
+                                img_text = converter.convert_image(commands[1])
+                                for line in img_text.split("\n"):
+                                    lines.insert(position[1], line)
+                                    position[1] += 1
+                                position[0] = 0
+                            except Exception as e:
+                                canvas.message(f"Error converting image: {e}", color=(255, 0, 0))
+                        case _:
+                            canvas.message("That's not a command!", color=(255, 0, 0))
 
-        case _:
-            cursor_blink = time.time()
-            apply_quickfixes()
-            current_line = lines[position[1]]
-            pressed_key = pressed_key.replace("\t", "    ")
-            if pressed_key == "\b":
-                if position[0] == 0:
-                    position[0] = len(lines[position[1]-1]) - 1
-                    if position[1] != 0:
-                        lines[position[1]-1] += lines.pop(position[1])
-                        position[1] -= 1
-                else:    
-                    lines[position[1]] = current_line[0:position[0] - 1] + current_line[position[0]:len(current_line)]
-                    position[0] -= 2
-            else:
-                lines[position[1]] = current_line[0:position[0]] + pressed_key + current_line[position[0]:len(current_line)]
-            position[0] += len(pressed_key)
-    apply_quickfixes()
+            case _:
+                cursor_blink = time.time()
+                apply_quickfixes()
+                current_line = lines[position[1]]
+                pressed_key = pressed_key.replace("\t", "    ")
+                if pressed_key == "\b":
+                    if position[0] == 0:
+                        position[0] = len(lines[position[1]-1]) - 1
+                        if position[1] != 0:
+                            lines[position[1]-1] += lines.pop(position[1])
+                            position[1] -= 1
+                    else:    
+                        lines[position[1]] = current_line[0:position[0] - 1] + current_line[position[0]:len(current_line)]
+                        position[0] -= 2
+                else:
+                    lines[position[1]] = current_line[0:position[0]] + pressed_key + current_line[position[0]:len(current_line)]
+                position[0] += len(pressed_key)
+        apply_quickfixes()
+        pressed_key = tui.getkey()
     canvas.clear()
 
     for extension in extensions:
-        extension.pretick(canvas)
+        extension.pretick(canvas, globals())
 
     for i, line in enumerate(lines):
         index_text = f" {i} "
@@ -214,6 +227,11 @@ while running:
         # if line.startswith("//") or line.startswith("#"):
         #     line_highlight = (209, 96, 61)
 
+        origin = i - position[1]
+        if (origin + canvas.size[1]) < 0:
+            continue
+        if origin > canvas.size[1]:
+            break
         tokens = syntax.LexicalAnalyzer().lex(line)
         offset = len(f" {len(lines)} ")
         is_comment = False
@@ -243,10 +261,10 @@ while running:
         canvas.plot(position[0] + shift, position[1], fill="|")
     center_y = (position[1] + round(canvas.size[1] / 2))
     canvas.move((canvas.size[0] - position[0] - shift - 5 if (position[0] + shift) > canvas.size[0] else 0, canvas.size[1] - center_y if center_y > canvas.size[1] else 0))
-    canvas.put((0, canvas.size[1] - 1), f"Lines: {len(lines)}, {"unsaved" if last_saved == None else last_saved} | ATE v2.2.0 {' ' * canvas.size[0]}", color=(227, 193, 111))
+    canvas.put((0, canvas.size[1] - 1), f"Lines: {len(lines)}, {"unsaved" if last_saved == None else last_saved} | ATE v3.0.2 {' ' * canvas.size[0]}", color=(227, 193, 111))
 
     for extension in extensions:
-        extension.posttick(canvas)
+        extension.posttick(canvas, globals())
 
     canvas.print()
 
